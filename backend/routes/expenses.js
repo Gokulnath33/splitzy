@@ -4,11 +4,20 @@ const Expense = require("../models/Expense");
 const Settlement = require("../models/Settlement");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
+const { validateBody, expenseSchema, settlementSchema } = require("../middleware/validation");
 const { calculateBalances, simplifyDebts } = require("../utils/settleUp");
+const { sendPaymentReceivedEmail, sendExpenseAddedEmail } = require("../utils/email");
 
 const router = express.Router();
 
-// Get expenses, settlements, computed balances, and live progress stats
+const CURRENCY_SYMBOLS = {
+  INR: "₹",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+};
+
+// Get expenses, settlements, computed balances, category breakdown, and live progress stats
 router.get("/:groupId/summary", auth, async (req, res) => {
   const group = await Group.findById(req.params.groupId).populate("members", "name email color");
   if (!group) return res.status(404).json({ message: "Group not found" });
@@ -17,17 +26,22 @@ router.get("/:groupId/summary", auth, async (req, res) => {
     .populate("paidBy", "name email color")
     .sort({ createdAt: -1 });
   const settlements = await Settlement.find({ group: group._id })
-    .populate("from", "name color")
-    .populate("to", "name color")
+    .populate("from", "name color email")
+    .populate("to", "name color email")
     .sort({ createdAt: -1 });
 
   const balances = calculateBalances(group.members, expenses, settlements);
   const transactions = simplifyDebts(balances);
 
-  // Live "how much of this group is settled" progress stats
+  // Category breakdown analytics
+  const categories = { Food: 0, Transport: 0, Housing: 0, Entertainment: 0, Shopping: 0, General: 0 };
+  expenses.forEach((exp) => {
+    const cat = exp.category || "General";
+    categories[cat] = (categories[cat] || 0) + exp.amount;
+  });
+
   const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
   const totalSettled = settlements.reduce((sum, s) => sum + s.amount, 0);
-  // "amount that still needs to change hands" = sum of all outstanding debts
   const amountRemaining = transactions.reduce((sum, t) => sum + t.amount, 0);
   const amountToSettleOriginally = amountRemaining + totalSettled;
   const percentSettled =
@@ -41,6 +55,7 @@ router.get("/:groupId/summary", auth, async (req, res) => {
     settlements,
     balances,
     transactions,
+    categories,
     stats: {
       totalSpent,
       totalSettled,
@@ -53,35 +68,48 @@ router.get("/:groupId/summary", auth, async (req, res) => {
   });
 });
 
-// Add a new expense — broadcasts live to everyone viewing the group
-router.post("/:groupId/expenses", auth, async (req, res) => {
-  const { description, amount, paidBy, splitAmong } = req.body;
-  if (!description || !amount || !paidBy) {
-    return res.status(400).json({ message: "description, amount, and paidBy are required" });
-  }
+// Add a new expense — broadcasts live & sends email alert to group members
+router.post("/:groupId/expenses", auth, validateBody(expenseSchema), async (req, res) => {
+  const { description, amount, paidBy, category, splitType, splitAmong, splitDetails } = req.body;
+
+  const group = await Group.findById(req.params.groupId).populate("members", "name email");
+  if (!group) return res.status(404).json({ message: "Group not found" });
 
   const expense = await Expense.create({
     group: req.params.groupId,
     description,
     amount: Number(amount),
     paidBy,
+    category: category || "General",
+    splitType: splitType || "EQUAL",
     splitAmong: splitAmong && splitAmong.length ? splitAmong : undefined,
+    splitDetails: splitDetails && splitDetails.length ? splitDetails : undefined,
   });
   const populated = await expense.populate("paidBy", "name email color");
 
   const io = req.app.get("io");
   io.to(req.params.groupId).emit("expense:added", populated);
 
+  // Send Email Alert to group members (except the payer)
+  const recipientEmails = group.members
+    .filter((m) => m._id.toString() !== paidBy.toString())
+    .map((m) => m.email);
+
+  sendExpenseAddedEmail({
+    memberEmails: recipientEmails,
+    payerName: populated.paidBy.name,
+    description,
+    amount: Number(amount),
+    groupName: group.name,
+    currencySymbol: CURRENCY_SYMBOLS[group.currency] || "₹",
+  });
+
   res.status(201).json(populated);
 });
 
-// Mark a debt as settled — broadcasts live to the group AND sends a
-// personal "you got paid" notification straight to the recipient
-router.post("/:groupId/settle", auth, async (req, res) => {
+// Mark a debt as settled — broadcasts live AND sends email alert + socket notification
+router.post("/:groupId/settle", auth, validateBody(settlementSchema), async (req, res) => {
   const { from, to, amount } = req.body;
-  if (!from || !to || !amount) {
-    return res.status(400).json({ message: "from, to, and amount are required" });
-  }
 
   const settlement = await Settlement.create({
     group: req.params.groupId,
@@ -90,23 +118,38 @@ router.post("/:groupId/settle", auth, async (req, res) => {
     amount: Number(amount),
   });
   const populated = await settlement.populate([
-    { path: "from", select: "name color" },
-    { path: "to", select: "name color" },
+    { path: "from", select: "name color email" },
+    { path: "to", select: "name color email" },
   ]);
 
-  const group = await Group.findById(req.params.groupId).select("name");
+  const group = await Group.findById(req.params.groupId).select("name currency");
 
   const io = req.app.get("io");
   io.to(req.params.groupId).emit("settlement:added", populated);
 
-  // Targeted, personal notification to whoever just got paid
+  const currencySym = CURRENCY_SYMBOLS[group?.currency] || "₹";
+
+  // Targeted, personal socket notification to whoever just got paid
   io.to(`user:${to}`).emit("notification:paymentReceived", {
     fromName: populated.from.name,
     fromColor: populated.from.color,
     amount: populated.amount,
     groupName: group?.name,
     groupId: req.params.groupId,
+    currencySymbol: currencySym,
   });
+
+  // Targeted Email Alert to recipient
+  if (populated.to && populated.to.email) {
+    sendPaymentReceivedEmail({
+      toEmail: populated.to.email,
+      recipientName: populated.to.name,
+      payerName: populated.from.name,
+      amount: populated.amount,
+      groupName: group?.name || "Group",
+      currencySymbol: currencySym,
+    });
+  }
 
   res.status(201).json(populated);
 });

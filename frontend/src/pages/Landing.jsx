@@ -9,17 +9,17 @@ const strips = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-cream text-ink">
+    <div className="min-h-screen text-ink landing-page">
       {/* Nav */}
       <nav className="flex items-center justify-between px-8 py-6 max-w-6xl mx-auto">
         <span className="font-display text-2xl font-semibold text-emerald">splitzy</span>
         <div className="flex gap-3">
-          <Link to="/login" className="px-4 py-2 text-sm font-medium hover:text-emerald transition">
+          <Link to="/login" className="px-4 py-2 text-sm font-medium text-ink-secondary hover:text-emerald hover:scale-105 transition-all duration-300">
             Log in
           </Link>
           <Link
             to="/signup"
-            className="px-4 py-2 text-sm font-medium bg-emerald text-white rounded-full hover:bg-emerald-light transition"
+            className="px-5 py-2 text-sm font-medium btn-gradient-primary text-white rounded-full hover:shadow-lg hover:scale-105 transition-all duration-300"
           >
             Get started
           </Link>
@@ -37,13 +37,13 @@ export default function Landing() {
           >
             Split the bill.
             <br />
-            <span className="text-emerald">Not the friendship.</span>
+            <span className="text-gradient">Not the friendship.</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-lg text-ink/70 mb-8 max-w-md"
+            className="text-lg text-ink-secondary mb-8 max-w-md"
           >
             Add an expense from any phone. Everyone's balance updates instantly, live,
             for the whole group — no refreshing, no spreadsheets, no math.
@@ -55,7 +55,7 @@ export default function Landing() {
           >
             <Link
               to="/signup"
-              className="inline-block px-7 py-3.5 bg-emerald text-white rounded-full font-medium hover:bg-emerald-light transition"
+              className="inline-block px-7 py-3.5 btn-gradient-primary text-white rounded-full font-medium hover:shadow-xl hover:scale-105 transition-all duration-300"
             >
               Start a group — it's free
             </Link>
@@ -80,10 +80,10 @@ export default function Landing() {
                 style={{ top: i * 90, zIndex: strips.length - i }}
               >
                 <div className="flex justify-between items-baseline border-b border-dashed border-ink/15 pb-2 mb-2">
-                  <span className="font-mono text-xs text-ink/50">PAID BY {s.who.toUpperCase()}</span>
+                  <span className="font-mono text-xs text-ink-muted">PAID BY {s.who.toUpperCase()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="font-body text-sm">{s.label}</span>
+                  <span className="font-body text-sm" style={{ color: '#1a1d2e' }}>{s.label}</span>
                   <span className="font-mono font-semibold text-emerald">{s.amount}</span>
                 </div>
               </motion.div>
@@ -116,17 +116,17 @@ export default function Landing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="bg-white rounded-2xl p-6 border border-ink/10"
+              className="glass-card rounded-2xl p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
             >
-              <span className="font-mono text-sm text-coral">{String(i + 1).padStart(2, "0")}</span>
+              <span className="font-mono text-sm text-coral font-bold">{String(i + 1).padStart(2, "0")}</span>
               <h3 className="font-display text-xl font-semibold mt-2 mb-2">{step.title}</h3>
-              <p className="text-ink/70 text-sm leading-relaxed">{step.body}</p>
+              <p className="text-ink-secondary text-sm leading-relaxed">{step.body}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      <footer className="border-t border-ink/10 py-8 text-center text-sm text-ink/50">
+      <footer className="border-t border-ink/20 py-8 text-center text-sm text-ink-muted">
         Built with the MERN stack + Socket.IO — real-time settling, no refresh needed.
       </footer>
     </div>

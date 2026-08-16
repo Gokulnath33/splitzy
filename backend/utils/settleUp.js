@@ -7,23 +7,36 @@ function calculateBalances(members, expenses, settlements) {
   const balances = {}; // userId -> net balance
   members.forEach((m) => (balances[m._id.toString()] = 0));
 
-  // Each expense: payer gets credited full amount, each person in splitAmong
-  // gets debited their equal share
+  // Process expenses
   expenses.forEach((exp) => {
-    // exp.paidBy may be a populated user object ({_id, name, ...}) or a raw
-    // ObjectId depending on the query — handle both safely.
     const payerId = (exp.paidBy._id || exp.paidBy).toString();
-    const splitAmong = exp.splitAmong.length ? exp.splitAmong : members.map((m) => m._id);
-    const share = exp.amount / splitAmong.length;
-
     balances[payerId] = (balances[payerId] || 0) + exp.amount;
-    splitAmong.forEach((uid) => {
-      const id = (uid._id || uid).toString();
-      balances[id] = (balances[id] || 0) - share;
-    });
+
+    if (exp.splitType === "EXACT" && exp.splitDetails && exp.splitDetails.length > 0) {
+      exp.splitDetails.forEach((detail) => {
+        const uid = (detail.user._id || detail.user).toString();
+        const amt = Number(detail.amount) || 0;
+        balances[uid] = (balances[uid] || 0) - amt;
+      });
+    } else if (exp.splitType === "PERCENTAGE" && exp.splitDetails && exp.splitDetails.length > 0) {
+      exp.splitDetails.forEach((detail) => {
+        const uid = (detail.user._id || detail.user).toString();
+        const pct = Number(detail.percentage) || 0;
+        const amt = (exp.amount * pct) / 100;
+        balances[uid] = (balances[uid] || 0) - amt;
+      });
+    } else {
+      // Default: EQUAL split
+      const splitAmong = exp.splitAmong && exp.splitAmong.length ? exp.splitAmong : members.map((m) => m._id);
+      const share = exp.amount / splitAmong.length;
+      splitAmong.forEach((uid) => {
+        const id = (uid._id || uid).toString();
+        balances[id] = (balances[id] || 0) - share;
+      });
+    }
   });
 
-  // Apply any manual settlements (money that has already changed hands)
+  // Apply any manual settlements
   settlements.forEach((s) => {
     const fromId = (s.from._id || s.from).toString();
     const toId = (s.to._id || s.to).toString();

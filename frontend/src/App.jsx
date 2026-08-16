@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import GroupView from "./pages/GroupView";
+import AdminDashboard from "./pages/AdminDashboard";
 import { useAuth } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import ToastStack from "./components/ToastStack";
@@ -51,6 +52,14 @@ export default function App() {
             element={
               <PrivateRoute>
                 <PageTransition><GroupView /></PageTransition>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <PrivateRoute>
+                <PageTransition><AdminDashboard /></PageTransition>
               </PrivateRoute>
             }
           />

@@ -5,8 +5,10 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
-    // used for avatar color in the UI
     color: { type: String, default: () => randomColor() },
+    isApproved: { type: Boolean, default: false },
+    resetCode: { type: String },
+    resetCodeExpires: { type: Date },
   },
   { timestamps: true }
 );
