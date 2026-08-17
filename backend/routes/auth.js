@@ -288,6 +288,29 @@ router.delete("/reject/:userId", authMiddleware, async (req, res) => {
   }
 });
 
+// Admin Delete Approved User Endpoint
+router.delete("/delete-user/:userId", authMiddleware, async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+    if (!adminUser || adminUser.email !== ADMIN_EMAIL) {
+      return res.status(403).json({ message: "Forbidden: Admin only" });
+    }
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.email === ADMIN_EMAIL) {
+      return res.status(400).json({ message: "Cannot delete the admin account" });
+    }
+
+    console.log(`[Admin] Deleting user: ${user.email}`);
+    await User.findByIdAndDelete(req.params.userId);
+
+    res.json({ success: true, message: "User deleted successfully." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/find", async (req, res) => {
   const { email } = req.query;
   const user = await User.findOne({ email: email?.toLowerCase() }).select("name email color");

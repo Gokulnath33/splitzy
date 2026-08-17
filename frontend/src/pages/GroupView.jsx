@@ -8,6 +8,8 @@ import AnimatedNumber from "../components/AnimatedNumber";
 import PresenceAvatars from "../components/PresenceAvatars";
 import GroupProgress from "../components/GroupProgress";
 import CategoryAnalytics from "../components/CategoryAnalytics";
+import LiveBackground from "../components/LiveBackground";
+import SplitzyLogo from "../components/SplitzyLogo";
 import { getCurrencySymbol } from "../utils/currency";
 
 const CATEGORIES = [
@@ -161,10 +163,12 @@ export default function GroupView() {
 
   return (
     <div className="dashboard-bg min-h-screen">
+      <LiveBackground variant="particles" />
+      <div className="grid-overlay"></div>
       <nav className="nav-glass flex items-center justify-between px-8 py-5">
         <div className="flex items-center gap-4">
-          <Link to="/dashboard" className="font-display text-xl font-semibold text-gradient">
-            splitzy
+          <Link to="/dashboard" className="inline-block">
+            <SplitzyLogo size="sm" animated />
           </Link>
           <span className="text-ink-muted">/</span>
           <span className="font-medium">{group.name}</span>

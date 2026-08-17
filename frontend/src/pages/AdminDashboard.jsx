@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import api from "../utils/api";
+import LiveBackground from "../components/LiveBackground";
+import SplitzyLogo from "../components/SplitzyLogo";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -77,6 +79,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDelete = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to delete "${userName}"? This action cannot be undone.`)) return;
+    setActionLoading(true);
+    try {
+      await api.delete(`/auth/delete-user/${userId}`);
+      addToast(`User "${userName}" deleted successfully`, "success");
+      await refreshData();
+    } catch (err) {
+      addToast(err.response?.data?.message || "Failed to delete user", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="dashboard-bg flex justify-center items-center h-screen">
@@ -87,9 +103,11 @@ export default function AdminDashboard() {
 
   return (
     <div className="dashboard-bg min-h-screen">
+      <LiveBackground variant="particles" />
+      <div className="grid-overlay"></div>
       <nav className="nav-glass flex items-center justify-between px-8 py-5">
-        <Link to="/" className="font-display text-xl font-semibold text-gradient">
-          splitzy
+        <Link to="/" className="inline-block">
+          <SplitzyLogo size="md" animated />
         </Link>
         <Link
           to="/dashboard"
@@ -99,8 +117,27 @@ export default function AdminDashboard() {
         </Link>
       </nav>
 
-      <div className="max-w-4xl mx-auto px-8 py-12">
+      <div className="max-w-5xl mx-auto px-8 py-12">
         <h1 className="font-display text-3xl font-semibold mb-8 text-gradient-violet text-ink">Admin Dashboard</h1>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="stat-card admin-stat-card card-shine rounded-2xl p-5 hover-lift-glow border-l-4 border-emerald">
+            <p className="text-ink-muted text-xs font-medium uppercase tracking-wide">Pending</p>
+            <p className="font-display text-3xl font-bold text-emerald mt-1">{pendingUsers.length}</p>
+            <p className="text-ink-muted text-xs mt-1">Awaiting approval</p>
+          </div>
+          <div className="stat-card admin-stat-card card-shine rounded-2xl p-5 hover-lift-glow border-l-4 border-violet">
+            <p className="text-ink-muted text-xs font-medium uppercase tracking-wide">Approved</p>
+            <p className="font-display text-3xl font-bold text-violet mt-1">{approvedUsers.length}</p>
+            <p className="text-ink-muted text-xs mt-1">Active users</p>
+          </div>
+          <div className="stat-card admin-stat-card card-shine rounded-2xl p-5 hover-lift-glow border-l-4 border-amber">
+            <p className="text-ink-muted text-xs font-medium uppercase tracking-wide">Total Approvals</p>
+            <p className="font-display text-3xl font-bold text-amber mt-1">{approvalHistory.length}</p>
+            <p className="text-ink-muted text-xs mt-1">All-time history</p>
+          </div>
+        </div>
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-x-6 gap-y-2 mb-8 border-b border-ink/10 pb-1">
@@ -132,7 +169,7 @@ export default function AdminDashboard() {
           transition={{ duration: 0.2 }}
         >
           {activeTab === "pending" && (
-            <div className="glass-card rounded-2xl p-6">
+            <div className="glass-card card-shine rounded-2xl p-6 hover-lift-glow">
               {pendingUsers.length === 0 ? (
                 <p className="text-ink-secondary text-center py-8">No pending users.</p>
               ) : (
@@ -150,14 +187,14 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleApprove(u._id)}
                           disabled={actionLoading}
-                          className="px-4 py-2 btn-gradient-primary text-white rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-4 py-2 btn-gradient-primary btn-magnetic text-white rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {actionLoading ? "..." : "Approve"}
                         </button>
                         <button
                           onClick={() => handleReject(u._id)}
                           disabled={actionLoading}
-                          className="px-4 py-2 btn-gradient-coral text-white rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-4 py-2 btn-gradient-coral btn-magnetic text-white rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {actionLoading ? "..." : "Reject"}
                         </button>
@@ -170,7 +207,7 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === "approved" && (
-            <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="glass-card card-shine rounded-2xl overflow-hidden hover-lift-glow">
               {approvedUsers.length === 0 ? (
                 <p className="text-ink-secondary text-center py-8">No approved users yet.</p>
               ) : (
@@ -182,6 +219,7 @@ export default function AdminDashboard() {
                         <th className="px-6 py-3 font-semibold text-ink">Email</th>
                         <th className="px-6 py-3 font-semibold text-ink">Joined</th>
                         <th className="px-6 py-3 font-semibold text-ink">Status</th>
+                        <th className="px-6 py-3 font-semibold text-ink">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ink/20">
@@ -197,6 +235,15 @@ export default function AdminDashboard() {
                                 Active
                               </span>
                             </td>
+                            <td className="px-6 py-4">
+                              <button
+                                onClick={() => handleDelete(u._id, u.name)}
+                                disabled={actionLoading}
+                                className="px-3 py-1.5 btn-gradient-delete btn-magnetic text-white rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {actionLoading ? "..." : "Delete"}
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -208,7 +255,7 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === "history" && (
-            <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="glass-card card-shine rounded-2xl overflow-hidden hover-lift-glow">
               {approvalHistory.length === 0 ? (
                 <p className="text-ink-secondary text-center py-8">No approval history available.</p>
               ) : (
